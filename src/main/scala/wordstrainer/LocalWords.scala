@@ -25,7 +25,7 @@ private object LocalWords {
     }
   }
 
-  def saveNewPairs(newPairs: Seq[(String, String)]): Unit = {
+  def saveNewPairs(newPairs: collection.Seq[(String, String)]): Unit = {
     if (newPairs.isEmpty) {
       return
     }

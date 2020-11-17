@@ -10,12 +10,14 @@ import java.util.Properties
 import com.fasterxml.jackson.core.{JsonFactory, JsonToken}
 
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.PropertiesHasAsScala
+import scala.util.control.Breaks.{break, breakable}
 
 
 private object GoogleSavedWords {
 
-  def get(): Array[(String, String)] = {
+  def getNew(lastLocalPair: Option[(String, String)]): collection.Seq[(String, String)] = {
     val secrets = loadSecrets()
 
     val savedWordsURI = URI.create("https://translate.google.com/translate_a/sg?cm=g&xt=" + secrets("xt"))
@@ -36,7 +38,7 @@ private object GoogleSavedWords {
         throw new RuntimeException("Failed to get saved words, Google replied with code " + resp.statusCode())
       }
 
-      parseSavedWords(resp.body())
+      parseSavedWords(resp.body(), lastLocalPair)
     } finally {
       resp.body().close()
     }
@@ -54,7 +56,7 @@ private object GoogleSavedWords {
   }
 
   // e.g.: [11,null,[["1dOhqSa4FX0","en","ru","halcyon","безмятежный",1604304344669106],["rWyW5SveDOo","en","ru","commensurate","соразмерный",1604429522984572]],null,1604489275415896,null,10000]
-  def parseSavedWords(respBodyStream: InputStream): Array[(String, String)] = {
+  def parseSavedWords(respBodyStream: InputStream, lastLocalPair: Option[(String, String)]): collection.Seq[(String, String)] = {
     val parser = new JsonFactory().createParser(respBodyStream)
     try {
       if (parser.nextToken() != JsonToken.START_ARRAY) {
@@ -72,47 +74,41 @@ private object GoogleSavedWords {
         }
       }
 
-      val res = new Array[(String, String)](numPairs)
-      for (i <- 0 until numPairs) {
-        if (parser.nextToken() != JsonToken.START_ARRAY) {
-          throw new IllegalStateException("Unknown Google response format: expected " + numPairs + " words, but got " + i)
+      val res = new ArrayBuffer[(String, String)]()
+      breakable {
+        for (i <- 0 until numPairs) {
+          if (parser.nextToken() != JsonToken.START_ARRAY) {
+            throw new IllegalStateException("Unknown Google response format: expected " + numPairs + " words, but got " + i)
+          }
+          parser.nextToken()
+          parser.nextToken()
+          parser.nextToken()
+
+          if (parser.nextToken() != JsonToken.VALUE_STRING) {
+            throw new IllegalStateException("Unknown Google response format: expected a word, but got " + parser.currentToken())
+          }
+          val word = parser.getValueAsString
+
+          if (parser.nextToken() != JsonToken.VALUE_STRING) {
+            throw new IllegalStateException("Unknown Google response format: expected a translation, but got " + parser.currentToken())
+          }
+          val translation = parser.getValueAsString
+
+          if (lastLocalPair.isDefined && lastLocalPair.get._1 == word && lastLocalPair.get._2 == translation) {
+            break
+          }
+
+          res.addOne(word, translation)
+
+          while (parser.nextToken() != JsonToken.END_ARRAY) {}
         }
-        parser.nextToken()
-        parser.nextToken()
-        parser.nextToken()
-
-        if (parser.nextToken() != JsonToken.VALUE_STRING) {
-          throw new IllegalStateException("Unknown Google response format: expected a word, but got " + parser.currentToken())
-        }
-        val word = parser.getValueAsString
-
-        if (parser.nextToken() != JsonToken.VALUE_STRING) {
-          throw new IllegalStateException("Unknown Google response format: expected a translation, but got " + parser.currentToken())
-        }
-        val translation = parser.getValueAsString
-
-        res(i) = (word, translation)
-
-        while (parser.nextToken() != JsonToken.END_ARRAY) {}
       }
-      reverse(res)
-      res
+
+      res.reverse
     } finally {
       parser.close()
     }
 
-  }
-
-  private def reverse[T](arr: Array[T]): Unit = {
-    var i = 0
-    var j = arr.length-1
-    while(i < j) {
-      val temp = arr(i)
-      arr(i) = arr(j)
-      arr(j) = temp
-      i+=1
-      j-=1
-    }
   }
 
 }

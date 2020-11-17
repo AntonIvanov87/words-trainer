@@ -3,10 +3,10 @@ package wordstrainer
 private object Main {
 
   def main(args: Array[String]): Unit = {
-    val allPairs = GoogleSavedWords.get()
 
     val lastLocalPair = LocalWords.getLastPair()
-    val newPairs = getNewPairs(allPairs, lastLocalPair)
+    // TODO: do it async
+    val newPairs = GoogleSavedWords.getNew(lastLocalPair)
     LocalWords.saveNewPairs(newPairs)
     println("Got " + newPairs.length + " new words")
 
@@ -15,17 +15,6 @@ private object Main {
     val answers = Trainer.train(wordsToTrain)
 
     saveAnswers(wordsToTrain, answers)
-  }
-
-  private def getNewPairs(allPairs: Array[(String, String)], lastLocalPair: Option[(String, String)]): Array[(String, String)] = {
-    if (lastLocalPair.isDefined) {
-      for (i <- allPairs.indices.reverse) {
-        if (allPairs(i) == lastLocalPair.get) {
-          return allPairs.drop(i+1)
-        }
-      }
-    }
-    allPairs
   }
 
   private def saveAnswers(trainedWords: collection.Seq[LocalWords.WordToTrain], answers: Array[Boolean]): Unit = {
