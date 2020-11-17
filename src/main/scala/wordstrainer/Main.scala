@@ -10,11 +10,13 @@ private object Main {
     LocalWords.saveNewPairs(newPairs)
     println("Got " + newPairs.length + " new words")
 
-    val wordsToTrain = LocalWords.getWordsToTrain()
+    val trainingData = LocalWords.getTrainingData()
+    println(trainingData.totalToTrain + " words to train")
+    println(trainingData.totalTrained + " words trained")
 
-    val answers = Trainer.train(wordsToTrain)
+    val answers = Trainer.train(trainingData.wordsToTrain)
 
-    saveAnswers(wordsToTrain, answers)
+    saveAnswers(trainingData.wordsToTrain, answers)
   }
 
   private def saveAnswers(trainedWords: collection.Seq[LocalWords.WordToTrain], answers: Array[Boolean]): Unit = {
