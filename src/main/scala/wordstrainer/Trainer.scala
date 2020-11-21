@@ -7,14 +7,14 @@ private object Trainer {
     var i = 0
     for (w <- words) {
       // TODO: add color
-      print('\n' + w.question)
+      print("\n" + w.question)
       Console.in.readLine()
 
       print(w.answer)
 
       var answer: String = null
       do {
-        print( " y/n? ")
+        print(" y/n? ")
         answer = Console.in.readLine()
       } while (answer != "y" && answer != "n")
 

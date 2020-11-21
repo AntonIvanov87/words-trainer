@@ -4,36 +4,24 @@ private object Main {
 
   def main(args: Array[String]): Unit = {
 
-    val lastLocalPair = LocalWords.getLastPair()
+    val settings = Settings()
+
+    val localWords = LocalWords(settings.dataDir)
+    val lastLocalPair = localWords.getLastPair()
+
     // TODO: do it async
-    val newPairs = GoogleSavedWords.getNew(lastLocalPair)
-    LocalWords.saveNewPairs(newPairs)
+    val newPairs =
+      GoogleSavedWords.getNew(lastLocalPair, settings.googleSecrets)
+    localWords.saveNewPairs(newPairs)
     println("Got " + newPairs.length + " new words")
 
-    val trainingData = LocalWords.getTrainingData()
-    println(trainingData.totalToTrain + " words to train")
-    println(trainingData.totalTrained + " words trained")
+    val trainingData = localWords.getTrainingData()
+    println(s"${trainingData.totalToTrain} words to train")
+    println(s"${trainingData.totalTrained} words trained")
 
     val answers = Trainer.train(trainingData.wordsToTrain)
 
-    saveAnswers(trainingData.wordsToTrain, answers)
-  }
+    localWords.saveAnswers(trainingData.wordsToTrain, answers)
 
-  private def saveAnswers(trainedWords: collection.Seq[LocalWords.WordToTrain], answers: Array[Boolean]): Unit = {
-    val metaFile = new MetaFile
-    try {
-      var i = 0
-      for (w <- trainedWords) {
-        metaFile.seekRecord(w.metaRecordIndex)
-        if (answers(i)) {
-          metaFile.inc(w.reverse)
-        } else {
-          metaFile.resetRecord()
-        }
-        i+=1
-      }
-    } finally {
-      metaFile.close()
-    }
   }
 }

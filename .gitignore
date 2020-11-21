@@ -2,6 +2,8 @@
 /.idea/
 /project/target/
 /target/
-/secrets.properties
+/settings.properties
 /meta.dat
 /words.dat
+
+.DS_Store
