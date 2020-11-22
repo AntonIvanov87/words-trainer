@@ -153,8 +153,11 @@ private class LocalWords private (dataDir: String) {
           val trainingType = getTrainingType(metaRecord)
           if (trainingType != TrainingType.DoNotTrain) {
             if (wordsToTrain.length < 10) {
-              wordsToTrain.addOne(
-                newWordToTrain(metaRecord, i, wordsFile, trainingType)
+              wordsToTrain += newWordToTrain(
+                metaRecord,
+                i,
+                wordsFile,
+                trainingType
               )
             }
             totalToTrain += 1

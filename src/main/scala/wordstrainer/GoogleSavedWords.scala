@@ -119,7 +119,7 @@ private object GoogleSavedWords {
             break()
           }
 
-          res.addOne(word, translation)
+          res += ((word, translation))
 
           while (parser.nextToken() != JsonToken.END_ARRAY) {}
         }

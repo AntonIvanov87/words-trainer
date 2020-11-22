@@ -1,9 +1,5 @@
-/.bsp/
-/.idea/
-/project/target/
-/target/
-/settings.properties
-/meta.dat
-/words.dat
 
+/.ijwb/
+/bazel-*
+/settings.properties
 .DS_Store
