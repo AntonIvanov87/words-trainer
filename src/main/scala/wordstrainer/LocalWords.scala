@@ -21,34 +21,6 @@ private object LocalWords {
     metaFile.write(new MetaFile.Record(wordPairOffset))
   }
 
-  private def getTrainingType(
-      metaRecord: MetaFile.Record
-  ): TrainingType.TrainingType = {
-    val curTime = System.currentTimeMillis()
-    val nextWordTransTime = getNextTrainTime(
-      metaRecord.wordTransSuccesses,
-      metaRecord.wordTransLastTime
-    )
-    val nextTransWordTime = getNextTrainTime(
-      metaRecord.transWordSuccesses,
-      metaRecord.transWordLastTime
-    )
-
-    if (
-      nextWordTransTime <= nextTransWordTime
-      && nextWordTransTime <= curTime
-    ) {
-      TrainingType.WordTrans
-    } else if (
-      nextTransWordTime <= nextWordTransTime
-      && nextTransWordTime <= curTime
-    ) {
-      TrainingType.TransWord
-    } else {
-      TrainingType.DoNotTrain
-    }
-  }
-
   private def getNextTrainTime(successes: Byte, lastSuccessTime: Long): Long =
     lastSuccessTime + TimeUnit.DAYS.toMillis(successes)
 
@@ -148,23 +120,51 @@ private class LocalWords private (dataDir: String) {
     try {
       val wordsFile = WordsFile(dataDir)
       try {
-        var i = 0
+        var metaRecordIdx = 0
+        val curTime = System.currentTimeMillis()
         for (metaRecord <- metaFile) {
-          val trainingType = getTrainingType(metaRecord)
-          if (trainingType != TrainingType.DoNotTrain) {
-            if (wordsToTrain.length < 10) {
-              wordsToTrain += newWordToTrain(
-                metaRecord,
-                i,
-                wordsFile,
-                trainingType
-              )
-            }
+
+          val nextWordTransTime = getNextTrainTime(
+            metaRecord.wordTransSuccesses,
+            metaRecord.wordTransLastTime
+          )
+          val nextTransWordTime = getNextTrainTime(
+            metaRecord.transWordSuccesses,
+            metaRecord.transWordLastTime
+          )
+
+          var trainingType = TrainingType.DoNotTrain
+
+          if (nextWordTransTime <= curTime) {
             totalToTrain += 1
+            if (nextWordTransTime <= nextTransWordTime) {
+              trainingType = TrainingType.WordTrans
+            }
           } else {
             totalTrained += 1
           }
-          i += 1
+
+          if (nextTransWordTime <= curTime) {
+            totalToTrain += 1
+            if (nextTransWordTime < nextWordTransTime) {
+              trainingType = TrainingType.TransWord
+            }
+          } else {
+            totalTrained += 1
+          }
+
+          if (
+            trainingType != TrainingType.DoNotTrain && wordsToTrain.length < 10
+          ) {
+            wordsToTrain += newWordToTrain(
+              metaRecord,
+              metaRecordIdx,
+              wordsFile,
+              trainingType
+            )
+          }
+
+          metaRecordIdx += 1
         }
       } finally {
         wordsFile.close()
