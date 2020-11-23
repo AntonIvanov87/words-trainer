@@ -1,7 +1,8 @@
 package wordstrainer
 
 import java.io.FileNotFoundException
-import java.util.concurrent.TimeUnit
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import scala.collection.mutable.ArrayBuffer
 import wordstrainer.LocalWords._
 
@@ -22,7 +23,12 @@ private object LocalWords {
   }
 
   private def getNextTrainTime(successes: Byte, lastSuccessTime: Long): Long =
-    lastSuccessTime + TimeUnit.DAYS.toMillis(successes)
+    // TODO: store lastSuccessTime in days instead of millis, that will require short instead of long
+    Instant
+      .ofEpochMilli(lastSuccessTime)
+      .truncatedTo(ChronoUnit.DAYS)
+      .plus(1 * successes, ChronoUnit.DAYS)
+      .toEpochMilli()
 
   private def newWordToTrain(
       metaRecord: MetaFile.Record,
