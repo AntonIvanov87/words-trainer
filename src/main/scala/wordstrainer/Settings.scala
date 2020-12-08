@@ -9,10 +9,7 @@ private case class Settings private (
 )
 
 private case class GoogleSecrets private (
-    xt: String,
-    sid: String,
-    hsid: String,
-    ssid: String
+    _Secure3PSID: String
 )
 
 private object Settings {
@@ -31,10 +28,7 @@ private object Settings {
       }
 
     val googleSecrets = GoogleSecrets(
-      getOrThrow(props, "xt"),
-      getOrThrow(props, "SID"),
-      getOrThrow(props, "HSID"),
-      getOrThrow(props, "SSID")
+      getOrThrow(props, "__Secure-3PSID")
     )
     Settings(
       getOrThrow(props, "data_dir"),
