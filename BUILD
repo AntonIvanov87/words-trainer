@@ -8,4 +8,10 @@ scala_binary(
     unused_dependency_checker_mode = "error"
 )
 
-# TODO: add PrintLocalWordsMain
+scala_binary(
+    name = "print-local",
+    srcs = glob(["src/main/scala/wordstrainer/*.scala"]),
+    data = ["settings.properties"],
+    main_class = "wordstrainer.PrintLocalWordsMain",
+    unused_dependency_checker_mode = "error"
+)
