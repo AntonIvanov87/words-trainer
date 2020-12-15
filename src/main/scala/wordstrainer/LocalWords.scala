@@ -26,8 +26,8 @@ private object LocalWords {
     // TODO: store lastSuccessTime in days instead of millis, that will require short instead of long
     Instant
       .ofEpochMilli(lastSuccessTime)
+      .plus(36 * successes, ChronoUnit.HOURS)
       .truncatedTo(ChronoUnit.DAYS)
-      .plus(1 * successes, ChronoUnit.DAYS)
       .toEpochMilli()
 
   private def newWordToTrain(
