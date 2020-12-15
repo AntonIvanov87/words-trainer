@@ -3,6 +3,7 @@ package wordstrainer
 import java.io.FileNotFoundException
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.ThreadLocalRandom
 import scala.collection.mutable.ArrayBuffer
 import wordstrainer.LocalWords._
 
@@ -134,30 +135,42 @@ private class LocalWords private (dataDir: String) {
             metaRecord.wordTransSuccesses,
             metaRecord.wordTransLastTime
           )
+          val trainWordTrans =
+            if (nextWordTransTime <= curTime) {
+              totalToTrain += 1
+              true
+            } else {
+              totalTrained += 1
+              false
+            }
+
           val nextTransWordTime = getNextTrainTime(
             metaRecord.transWordSuccesses,
             metaRecord.transWordLastTime
           )
-
-          var trainingType = TrainingType.DoNotTrain
-
-          if (nextWordTransTime <= curTime) {
-            totalToTrain += 1
-            if (nextWordTransTime <= nextTransWordTime) {
-              trainingType = TrainingType.WordTrans
+          val trainTransWord =
+            if (nextTransWordTime <= curTime) {
+              totalToTrain += 1
+              true
+            } else {
+              totalTrained += 1
+              false
             }
-          } else {
-            totalTrained += 1
-          }
 
-          if (nextTransWordTime <= curTime) {
-            totalToTrain += 1
-            if (nextTransWordTime < nextWordTransTime) {
-              trainingType = TrainingType.TransWord
+          val trainingType =
+            if (trainWordTrans && trainTransWord) {
+              if (ThreadLocalRandom.current().nextBoolean()) {
+                TrainingType.WordTrans
+              } else {
+                TrainingType.TransWord
+              }
+            } else if (trainWordTrans) {
+              TrainingType.WordTrans
+            } else if (trainTransWord) {
+              TrainingType.TransWord
+            } else {
+              TrainingType.DoNotTrain
             }
-          } else {
-            totalTrained += 1
-          }
 
           if (
             trainingType != TrainingType.DoNotTrain && wordsToTrain.length < 10

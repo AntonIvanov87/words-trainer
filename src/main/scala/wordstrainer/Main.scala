@@ -13,7 +13,7 @@ private object Main {
     val newPairs =
       GoogleSavedWords.getNew(lastLocalPair, settings.googleSecrets)
     localWords.saveNewPairs(newPairs)
-    println("Got " + newPairs.length + " new words")
+    println("Got " + newPairs.length + " new translations")
 
     val trainingData = localWords.getTrainingData()
     println(s"${trainingData.totalToTrain} words to train")
