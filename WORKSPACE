@@ -2,13 +2,13 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 # SCALA
 
-rules_scala_version="bc4896727a40e89d6b92e267c12a28964bc9a76b"
+rules_scala_version="9bd9ffd3e52ab9e92b4f7b43051d83231743f231"
 http_archive(
     name = "io_bazel_rules_scala",
     strip_prefix = "rules_scala-%s" % rules_scala_version,
     type = "zip",
     url = "https://github.com/bazelbuild/rules_scala/archive/%s.zip" % rules_scala_version,
-    sha256 = "db147ab5abfe4380a441daea4420922b5416fccd70092604b6acec5262b0ff72"
+    sha256 = "438bc03bbb971c45385fde5762ab368a3321e9db5aa78b96252736d86396a9da"
 )
 
 http_archive(
@@ -23,7 +23,7 @@ http_archive(
 # Stores Scala version and other configuration
 load("@io_bazel_rules_scala//:scala_config.bzl", "scala_config")
 scala_config(
-    scala_version = "2.12.12"
+    scala_version = "2.13.3"
 )
 
 load("@io_bazel_rules_scala//scala:toolchains.bzl", "scala_register_toolchains")

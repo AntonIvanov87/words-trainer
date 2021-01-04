@@ -4,18 +4,20 @@ import java.io.FileNotFoundException
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ThreadLocalRandom
-import scala.collection.mutable.ArrayBuffer
+
 import wordstrainer.LocalWords._
+
+import scala.collection.mutable.ArrayBuffer
 
 private object LocalWords {
 
   def apply(dataDir: String) = new LocalWords(dataDir)
 
   private def saveWordPair(
-      wordsFile: WordsFile,
-      metaFile: MetaFile,
-      wordPair: (String, String)
-  ): Unit = {
+                            wordsFile: WordsFile,
+                            metaFile: MetaFile,
+                            wordPair: (String, String)
+                          ): Unit = {
     val wordPairOffset = wordsFile.getFilePointer()
     wordsFile.write(wordPair._1)
     wordsFile.write(wordPair._2)
@@ -27,7 +29,7 @@ private object LocalWords {
     // TODO: store lastSuccessTime in days instead of millis, that will require short instead of long
     Instant
       .ofEpochMilli(lastSuccessTime)
-      .plus(36 * successes, ChronoUnit.HOURS)
+      .plus(Math.pow(successes, 1.4).round, ChronoUnit.DAYS)
       .truncatedTo(ChronoUnit.DAYS)
       .toEpochMilli()
 
