@@ -3,6 +3,8 @@ package wordstrainer
 import java.io.{File, FileNotFoundException, RandomAccessFile}
 import wordstrainer.MetaFile.{fileName, recordLen}
 
+import scala.collection.mutable
+
 private object MetaFile {
   private val fileName = "meta.dat"
 
@@ -51,11 +53,16 @@ private object MetaFile {
 }
 
 private class MetaFile private (dataDir: String)
-    extends AutoCloseable
-    with Iterable[MetaFile.Record] {
+    extends mutable.IndexedSeq[MetaFile.Record]
+    with AutoCloseable {
 
   // TODO: extract write methods into a separate class
   private val raf = new RandomAccessFile(new File(dataDir, fileName), "rw")
+
+  override def update(idx: Int, elem: MetaFile.Record): Unit = {
+    seekRecord(idx)
+    write(elem)
+  }
 
   def write(metaRecord: MetaFile.Record): Unit = {
     raf.writeLong(metaRecord.wordsFileOffset)
@@ -88,15 +95,12 @@ private class MetaFile private (dataDir: String)
     raf.writeLong(System.currentTimeMillis())
   }
 
-  def read(): MetaFile.Record = {
-    MetaFile.Record(
-      raf.readLong(),
-      raf.readByte(),
-      raf.readLong(),
-      raf.readByte(),
-      raf.readLong()
-    )
+  override def apply(i: Int): MetaFile.Record = {
+    seekRecord(i)
+    read()
   }
+
+  override def length: Int = (raf.length() / recordLen).toInt
 
   def seekRecord(index: Int): Unit = raf.seek(index * recordLen)
 
@@ -118,6 +122,20 @@ private class MetaFile private (dataDir: String)
 
     }
 
+  def removeLast(): Unit = {
+    raf.setLength(raf.length() - recordLen)
+  }
+
   override def close(): Unit = raf.close()
+
+  private[this] def read(): MetaFile.Record = {
+    MetaFile.Record(
+      raf.readLong(),
+      raf.readByte(),
+      raf.readLong(),
+      raf.readByte(),
+      raf.readLong()
+    )
+  }
 
 }

@@ -19,8 +19,7 @@ private object LocalWords {
                             wordPair: (String, String)
                           ): Unit = {
     val wordPairOffset = wordsFile.getFilePointer()
-    wordsFile.write(wordPair._1)
-    wordsFile.write(wordPair._2)
+    wordsFile += wordPair
 
     metaFile.write(new MetaFile.Record(wordPairOffset))
   }
@@ -39,9 +38,7 @@ private object LocalWords {
       wordsFile: WordsFile,
       trainingType: TrainingType.TrainingType
   ): WordToTrain = {
-    wordsFile.seek(metaRecord.wordsFileOffset)
-    val word = wordsFile.read()
-    val trans = wordsFile.read()
+    val (word, trans) = wordsFile.readAt(metaRecord.wordsFileOffset)
     if (trainingType == TrainingType.WordTrans) {
       WordToTrain(word, trans, metaRecordIndex, reverse = false)
     } else {
@@ -79,11 +76,7 @@ private class LocalWords private (dataDir: String) {
 
     val wordsFile = WordsFile(dataDir)
     try {
-      wordsFile.seek(lastWordPairOffset.get)
-      val word = wordsFile.read()
-      val translation = wordsFile.read()
-      Some(word, translation)
-
+      Some(wordsFile.readAt(lastWordPairOffset.get))
     } finally {
       wordsFile.close()
     }
@@ -101,7 +94,6 @@ private class LocalWords private (dataDir: String) {
       val metaFile = MetaFile(dataDir)
       try {
         metaFile.seekEnd()
-
         for (wordPair <- newPairs) {
           saveWordPair(wordsFile, metaFile, wordPair)
         }
@@ -132,7 +124,6 @@ private class LocalWords private (dataDir: String) {
         var metaRecordIdx = 0
         val curTime = System.currentTimeMillis()
         for (metaRecord <- metaFile) {
-
           val nextWordTransTime = getNextTrainTime(
             metaRecord.wordTransSuccesses,
             metaRecord.wordTransLastTime
