@@ -1,5 +1,7 @@
 package wordstrainer
 
+import wordstrainer.local.{LocalWords, MetaFile, WordsFile}
+
 private object PrintLocalWordsMain {
   def main(args: Array[String]): Unit = {
     val settings = Settings()
@@ -12,7 +14,7 @@ private object PrintLocalWordsMain {
         )
         for (m <- metaFile) {
           val (word, trans) = wordsFile.readAt(m.wordsFileOffset)
-          println(Pairs.toString(m, word, trans))
+          println(LocalWords.toString(m, word, trans))
         }
       } finally {
         wordsFile.close()

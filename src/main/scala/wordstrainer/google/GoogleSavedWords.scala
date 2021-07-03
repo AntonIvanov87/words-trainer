@@ -1,4 +1,4 @@
-package wordstrainer
+package wordstrainer.google
 
 import java.net.URI
 import java.net.http.HttpResponse.BodyHandlers
@@ -7,7 +7,7 @@ import java.time.Duration
 import scala.collection.mutable.ArrayBuffer
 import scala.util.matching.Regex
 
-private object GoogleSavedWords {
+private[wordstrainer] object GoogleSavedWords {
 
   def getNew(
       lastLocalPair: Option[(String, String)],

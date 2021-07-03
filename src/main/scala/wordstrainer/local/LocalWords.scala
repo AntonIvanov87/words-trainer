@@ -1,42 +1,47 @@
-package wordstrainer
+package wordstrainer.local
+
+import wordstrainer.local.LocalWords._
 
 import java.io.FileNotFoundException
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ThreadLocalRandom
-
-import wordstrainer.LocalWords._
-
 import scala.collection.mutable.ArrayBuffer
 
-private object LocalWords {
+private[wordstrainer] object LocalWords {
 
   def apply(dataDir: String) = new LocalWords(dataDir)
 
+  def toString(metaRecord: MetaFile.Record, word: String, trans: String): String = {
+    metaRecord.wordsFileOffset + " " + word + " " + trans + " " +
+      metaRecord.wordTransSuccesses + " " + Instant.ofEpochMilli(metaRecord.wordTransLastTime) + " " +
+      metaRecord.transWordSuccesses + " " + Instant.ofEpochMilli(metaRecord.transWordLastTime)
+  }
+
   private def saveWordPair(
-                            wordsFile: WordsFile,
-                            metaFile: MetaFile,
-                            wordPair: (String, String)
-                          ): Unit = {
-    val wordPairOffset = wordsFile.getFilePointer()
+    wordsFile: WordsFile,
+    metaFile: MetaFile,
+    wordPair: (String, String)
+  ): Unit = {
+    val wordPairOffset = wordsFile.getFilePointer
     wordsFile += wordPair
 
-    metaFile.write(new MetaFile.Record(wordPairOffset))
+    metaFile.addOne(new MetaFile.Record(wordPairOffset))
   }
 
   private def getNextTrainTime(successes: Byte, lastSuccessTime: Long): Long =
-    // TODO: store lastSuccessTime in days instead of millis, that will require short instead of long
+  // TODO: store lastSuccessTime in days instead of millis, that will require short instead of long
     Instant
       .ofEpochMilli(lastSuccessTime)
       .plus(Math.pow(successes, 1.4).round, ChronoUnit.DAYS)
       .truncatedTo(ChronoUnit.DAYS)
-      .toEpochMilli()
+      .toEpochMilli
 
   private def newWordToTrain(
-      metaRecord: MetaFile.Record,
-      metaRecordIndex: Int,
-      wordsFile: WordsFile,
-      trainingType: TrainingType.TrainingType
+    metaRecord: MetaFile.Record,
+    metaRecordIndex: Int,
+    wordsFile: WordsFile,
+    trainingType: TrainingType.TrainingType
   ): WordToTrain = {
     val (word, trans) = wordsFile.readAt(metaRecord.wordsFileOffset)
     if (trainingType == TrainingType.WordTrans) {
@@ -47,16 +52,16 @@ private object LocalWords {
   }
 
   case class TrainingData(
-      totalToTrain: Int,
-      totalTrained: Int,
-      wordsToTrain: collection.Seq[WordToTrain]
+    totalToTrain: Int,
+    totalTrained: Int,
+    wordsToTrain: collection.Seq[WordToTrain]
   )
 
   case class WordToTrain(
-      question: String,
-      answer: String,
-      metaRecordIndex: Int,
-      reverse: Boolean
+    question: String,
+    answer: String,
+    metaRecordIndex: Int,
+    reverse: Boolean
   )
 
   private object TrainingType extends Enumeration {
@@ -66,9 +71,9 @@ private object LocalWords {
 
 }
 
-private class LocalWords private (dataDir: String) {
+private[wordstrainer] class LocalWords private(dataDir: String) {
 
-  def getLastPair(): Option[(String, String)] = {
+  def getLastPair: Option[(String, String)] = {
     val lastWordPairOffset = MetaFile.getLastWordPairOffset(dataDir)
     if (lastWordPairOffset.isEmpty) {
       return Option.empty
@@ -93,7 +98,6 @@ private class LocalWords private (dataDir: String) {
 
       val metaFile = MetaFile(dataDir)
       try {
-        metaFile.seekEnd()
         for (wordPair <- newPairs) {
           saveWordPair(wordsFile, metaFile, wordPair)
         }
@@ -107,7 +111,7 @@ private class LocalWords private (dataDir: String) {
     }
   }
 
-  def getTrainingData(): TrainingData = {
+  def getTrainingData: TrainingData = {
     var totalToTrain = 0
     var totalTrained = 0
     val wordsToTrain = new ArrayBuffer[WordToTrain](10)
@@ -188,18 +192,17 @@ private class LocalWords private (dataDir: String) {
   }
 
   def saveAnswers(
-      trainedWords: collection.Seq[LocalWords.WordToTrain],
-      answers: Array[Boolean]
+    trainedWords: collection.Seq[LocalWords.WordToTrain],
+    answers: Array[Boolean]
   ): Unit = {
     val metaFile = MetaFile(dataDir)
     try {
       var i = 0
       for (w <- trainedWords) {
-        metaFile.seekRecord(w.metaRecordIndex)
         if (answers(i)) {
-          metaFile.inc(w.reverse)
+          metaFile.inc(w.metaRecordIndex, w.reverse)
         } else {
-          metaFile.resetRecord()
+          metaFile.resetRecord(w.metaRecordIndex)
         }
         i += 1
       }

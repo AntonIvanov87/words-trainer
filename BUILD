@@ -2,7 +2,7 @@ load("@io_bazel_rules_scala//scala:scala.bzl", "scala_binary", "scala_library")
 
 scala_library(
     name = "words-trainer-lib",
-    srcs = glob(["src/main/scala/wordstrainer/*.scala"]),
+    srcs = glob(["src/main/scala/wordstrainer/**/*.scala"]),
     data = ["settings.properties"],
 )
 

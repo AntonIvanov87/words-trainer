@@ -1,15 +1,13 @@
 package wordstrainer
 
+import wordstrainer.google.GoogleSecrets
+
 import java.io.FileInputStream
 import java.util.Properties
 
 private case class Settings private (
     dataDir: String,
     googleSecrets: GoogleSecrets
-)
-
-private case class GoogleSecrets private (
-    _Secure3PSID: String
 )
 
 private object Settings {

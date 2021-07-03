@@ -1,5 +1,7 @@
 package wordstrainer
 
+import wordstrainer.local.{LocalWords, MetaFile, WordsFile}
+
 private object RemoveDuplicatesMain {
 
   def main(args: Array[String]): Unit = {
@@ -24,7 +26,7 @@ private object RemoveDuplicatesMain {
               if (word == baseWord && trans == baseTrans) {
                 dupFound = true
                 //println("Dup:  " + Pairs.toString(meta, word, trans))
-                println("Removing " + Pairs.toString(baseMeta, baseWord, baseTrans))
+                println("Removing " + LocalWords.toString(baseMeta, baseWord, baseTrans))
                 metaFile.removeLast()
                 wordsFile.removeFrom(baseMeta.wordsFileOffset)
                 removed = true

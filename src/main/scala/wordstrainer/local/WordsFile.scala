@@ -1,12 +1,12 @@
-package wordstrainer
+package wordstrainer.local
 
-import wordstrainer.WordsFile.fileName
+import wordstrainer.local.WordsFile.fileName
 
 import java.io.{File, RandomAccessFile}
 import java.nio.charset.Charset
 import scala.collection.mutable
 
-private object WordsFile {
+private[wordstrainer] object WordsFile {
 
   private val fileName = "words.dat"
 
@@ -14,7 +14,7 @@ private object WordsFile {
 
 }
 
-private class WordsFile private(dataDir: String)
+private[wordstrainer] class WordsFile private(dataDir: String)
   extends mutable.Growable[(String, String)]
     with AutoCloseable {
 
@@ -44,7 +44,7 @@ private class WordsFile private(dataDir: String)
     res
   }
 
-  def getFilePointer(): Long = raf.getFilePointer
+  def getFilePointer: Long = raf.getFilePointer
 
   def removeFrom(offset: Long): Unit = {
     raf.setLength(offset)
@@ -52,7 +52,7 @@ private class WordsFile private(dataDir: String)
 
   override def close(): Unit = raf.close()
 
-  override def clear(): Unit = ???
+  override def clear(): Unit = throw new UnsupportedOperationException
 
   private[this] def write(word: String): Unit = {
     val bytes = word.getBytes(Charset.forName("UTF-8"))

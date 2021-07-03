@@ -1,11 +1,11 @@
-package wordstrainer
+package wordstrainer.local
+
+import wordstrainer.local.MetaFile.{fileName, recordLen}
 
 import java.io.{File, FileNotFoundException, RandomAccessFile}
-import wordstrainer.MetaFile.{fileName, recordLen}
-
 import scala.collection.mutable
 
-private object MetaFile {
+private[wordstrainer] object MetaFile {
   private val fileName = "meta.dat"
 
   // wordsOffset: Long
@@ -52,35 +52,22 @@ private object MetaFile {
 
 }
 
-private class MetaFile private (dataDir: String)
-    extends mutable.IndexedSeq[MetaFile.Record]
+private[wordstrainer] class MetaFile private (dataDir: String)
+    extends IndexedSeq[MetaFile.Record]
+    with mutable.Growable[MetaFile.Record]
     with AutoCloseable {
 
-  // TODO: extract write methods into a separate class
+  // TODO: extract write methods into a separate class?
   private val raf = new RandomAccessFile(new File(dataDir, fileName), "rw")
 
-  override def update(idx: Int, elem: MetaFile.Record): Unit = {
-    seekRecord(idx)
+  override def addOne(elem: MetaFile.Record): MetaFile.this.type = {
+    seekEnd()
     write(elem)
+    this
   }
 
-  def write(metaRecord: MetaFile.Record): Unit = {
-    raf.writeLong(metaRecord.wordsFileOffset)
-    raf.writeByte(metaRecord.wordTransSuccesses)
-    raf.writeLong(metaRecord.wordTransLastTime)
-    raf.writeByte(metaRecord.transWordSuccesses)
-    raf.writeLong(metaRecord.transWordLastTime)
-  }
-
-  def resetRecord(): Unit = {
-    raf.readLong()
-    raf.writeByte(0)
-    raf.writeLong(0)
-    raf.writeByte(0)
-    raf.writeLong(0)
-  }
-
-  def inc(reverse: Boolean): Unit = {
+  def inc(i: Int, reverse: Boolean): Unit = {
+    seekRecord(i)
     if (!reverse) {
       raf.seek(raf.getFilePointer + 8)
     } else {
@@ -95,6 +82,15 @@ private class MetaFile private (dataDir: String)
     raf.writeLong(System.currentTimeMillis())
   }
 
+  def resetRecord(i: Int): Unit = {
+    seekRecord(i)
+    raf.readLong()
+    raf.writeByte(0)
+    raf.writeLong(0)
+    raf.writeByte(0)
+    raf.writeLong(0)
+  }
+
   override def apply(i: Int): MetaFile.Record = {
     seekRecord(i)
     read()
@@ -102,31 +98,25 @@ private class MetaFile private (dataDir: String)
 
   override def length: Int = (raf.length() / recordLen).toInt
 
-  def seekRecord(index: Int): Unit = raf.seek(index * recordLen)
-
-  def seekEnd(): Unit = raf.seek(raf.length())
-
-  override def iterator: Iterator[MetaFile.Record] =
-    new Iterator[MetaFile.Record] {
-
-      raf.seek(0)
-      private val numRecords = raf.length() / recordLen
-      private var curRecordIndex = 0
-
-      override def hasNext: Boolean = curRecordIndex < numRecords
-
-      override def next(): MetaFile.Record = {
-        curRecordIndex += 1
-        read()
-      }
-
-    }
+  override def knownSize: Int = super[IndexedSeq].knownSize
 
   def removeLast(): Unit = {
     raf.setLength(raf.length() - recordLen)
   }
 
   override def close(): Unit = raf.close()
+
+  private[this] def write(metaRecord: MetaFile.Record): Unit = {
+    raf.writeLong(metaRecord.wordsFileOffset)
+    raf.writeByte(metaRecord.wordTransSuccesses)
+    raf.writeLong(metaRecord.wordTransLastTime)
+    raf.writeByte(metaRecord.transWordSuccesses)
+    raf.writeLong(metaRecord.transWordLastTime)
+  }
+
+  private[this] def seekRecord(index: Int): Unit = raf.seek(index * recordLen)
+
+  private[this] def seekEnd(): Unit = raf.seek(raf.length())
 
   private[this] def read(): MetaFile.Record = {
     MetaFile.Record(
@@ -138,4 +128,5 @@ private class MetaFile private (dataDir: String)
     )
   }
 
+  override def clear(): Unit = throw new UnsupportedOperationException
 }

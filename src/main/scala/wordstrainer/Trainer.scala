@@ -1,5 +1,7 @@
 package wordstrainer
 
+import wordstrainer.local.LocalWords
+
 private object Trainer {
 
   def train(words: collection.Seq[LocalWords.WordToTrain]): Array[Boolean] = {

@@ -1,5 +1,8 @@
 package wordstrainer
 
+import wordstrainer.google.GoogleSavedWords
+import wordstrainer.local.LocalWords
+
 private object Main {
 
   def main(args: Array[String]): Unit = {
@@ -7,7 +10,7 @@ private object Main {
     val settings = Settings()
 
     val localWords = LocalWords(settings.dataDir)
-    val lastLocalPair = localWords.getLastPair()
+    val lastLocalPair = localWords.getLastPair
 
     // TODO: do it async
     val newPairs =
@@ -15,7 +18,7 @@ private object Main {
     localWords.saveNewPairs(newPairs)
     println("Got " + newPairs.length + " new translations")
 
-    val trainingData = localWords.getTrainingData()
+    val trainingData = localWords.getTrainingData
     println(s"${trainingData.totalToTrain} words to train")
     println(s"${trainingData.totalTrained} words trained")
 
