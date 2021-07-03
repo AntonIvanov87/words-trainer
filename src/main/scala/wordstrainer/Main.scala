@@ -9,14 +9,11 @@ private object Main {
 
     val settings = Settings()
 
-    val localWords = LocalWords(settings.dataDir)
-    val lastLocalPair = localWords.getLastPair
-
     // TODO: do it async
-    val newPairs =
-      GoogleSavedWords.getNew(lastLocalPair, settings.googleSecrets)
-    localWords.saveNewPairs(newPairs)
-    println("Got " + newPairs.length + " new translations")
+    val pairsFromGoogle = GoogleSavedWords.get(settings.googleSecrets)
+
+    val localWords = LocalWords(settings.dataDir)
+    localWords.saveNewPairs(pairsFromGoogle)
 
     val trainingData = localWords.getTrainingData
     println(s"${trainingData.totalToTrain} words to train")

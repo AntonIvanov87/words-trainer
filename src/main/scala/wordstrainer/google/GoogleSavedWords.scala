@@ -4,15 +4,13 @@ import java.net.URI
 import java.net.http.HttpResponse.BodyHandlers
 import java.net.http.{HttpClient, HttpRequest}
 import java.time.Duration
+import java.util.function.{BiConsumer, Supplier}
 import scala.collection.mutable.ArrayBuffer
 import scala.util.matching.Regex
 
 private[wordstrainer] object GoogleSavedWords {
 
-  def getNew(
-      lastLocalPair: Option[(String, String)],
-      secrets: GoogleSecrets
-  ): collection.Seq[(String, String)] = {
+  def get(secrets: GoogleSecrets): collection.Seq[(String, String)] = {
 
     val savedWordsURI = URI.create("https://translate.google.com/saved")
     val savedWordsReq = HttpRequest
@@ -40,35 +38,25 @@ private[wordstrainer] object GoogleSavedWords {
         )
       }
 
-      parseSavedWords(resp.body(), lastLocalPair)
+      parseSavedWords(resp.body())
     } finally {
       resp.body().close()
     }
   }
 
   def parseSavedWords(
-      respLines: java.util.stream.Stream[String],
-      lastLocalPair: Option[(String, String)]
+      respLines: java.util.stream.Stream[String]
   ): collection.Seq[(String, String)] = {
-
+    val pairs = ArrayBuffer[(String, String)]()
     val pairRegex: Regex =
-      // ["aphPo2NBCps","en","ru","heath","пустошь",1607184558359797,
-      """.*\["[^"]++","[a-z][a-z]","[a-z][a-z]","([^"]++)","([^"]++)",[0-9]+[],].*""".r
-    val res = new ArrayBuffer[(String, String)]()
-    respLines
-      .takeWhile({
-        case pairRegex(word, trans) =>
-          if (lastLocalPair.isEmpty || lastLocalPair.get != (word, trans)) {
-            res += ((word, trans))
-            true
-          } else {
-            // All other pairs are already known, stop iteration
-            false
-          }
-        case _: String => true
-      })
-      .forEach(_ => {})
-    res.reverse
+      // ["aphPo2NBCps","en","ru","heath","пустошь",1607184558359797
+      """\["[^"]++","[a-z][a-z]","[a-z][a-z]","([^"]++)","([^"]++)",[0-9]++[],]""".r
+    respLines.forEach { line =>
+      pairRegex.findAllMatchIn(line).foreach { m =>
+        pairs.addOne((m.group(1), m.group(2)))
+      }
+    }
+    pairs
   }
 
 }

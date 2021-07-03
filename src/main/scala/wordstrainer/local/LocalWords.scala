@@ -6,22 +6,27 @@ import java.io.FileNotFoundException
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ThreadLocalRandom
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 private[wordstrainer] object LocalWords {
 
   def apply(dataDir: String) = new LocalWords(dataDir)
 
-  def toString(metaRecord: MetaFile.Record, word: String, trans: String): String = {
-    metaRecord.wordsFileOffset + " " + word + " " + trans + " " +
-      metaRecord.wordTransSuccesses + " " + Instant.ofEpochMilli(metaRecord.wordTransLastTime) + " " +
-      metaRecord.transWordSuccesses + " " + Instant.ofEpochMilli(metaRecord.transWordLastTime)
+  def toString(
+      metaRecord: MetaFile.Record,
+      word: String,
+      trans: String
+  ): String = {
+    s"${metaRecord.wordsFileOffset} $word $trans " +
+      s"${metaRecord.wordTransSuccesses} ${Instant.ofEpochMilli(metaRecord.wordTransLastTime)} " +
+      s"${metaRecord.transWordSuccesses} ${Instant.ofEpochMilli(metaRecord.transWordLastTime)}"
   }
 
   private def saveWordPair(
-    wordsFile: WordsFile,
-    metaFile: MetaFile,
-    wordPair: (String, String)
+      wordsFile: WordsFile,
+      metaFile: MetaFile,
+      wordPair: (String, String)
   ): Unit = {
     val wordPairOffset = wordsFile.getFilePointer
     wordsFile += wordPair
@@ -30,7 +35,7 @@ private[wordstrainer] object LocalWords {
   }
 
   private def getNextTrainTime(successes: Byte, lastSuccessTime: Long): Long =
-  // TODO: store lastSuccessTime in days instead of millis, that will require short instead of long
+    // TODO: store lastSuccessTime in days instead of millis, that will require short instead of long
     Instant
       .ofEpochMilli(lastSuccessTime)
       .plus(Math.pow(successes, 1.4).round, ChronoUnit.DAYS)
@@ -38,10 +43,10 @@ private[wordstrainer] object LocalWords {
       .toEpochMilli
 
   private def newWordToTrain(
-    metaRecord: MetaFile.Record,
-    metaRecordIndex: Int,
-    wordsFile: WordsFile,
-    trainingType: TrainingType.TrainingType
+      metaRecord: MetaFile.Record,
+      metaRecordIndex: Int,
+      wordsFile: WordsFile,
+      trainingType: TrainingType.TrainingType
   ): WordToTrain = {
     val (word, trans) = wordsFile.readAt(metaRecord.wordsFileOffset)
     if (trainingType == TrainingType.WordTrans) {
@@ -52,16 +57,16 @@ private[wordstrainer] object LocalWords {
   }
 
   case class TrainingData(
-    totalToTrain: Int,
-    totalTrained: Int,
-    wordsToTrain: collection.Seq[WordToTrain]
+      totalToTrain: Int,
+      totalTrained: Int,
+      wordsToTrain: collection.Seq[WordToTrain]
   )
 
   case class WordToTrain(
-    question: String,
-    answer: String,
-    metaRecordIndex: Int,
-    reverse: Boolean
+      question: String,
+      answer: String,
+      metaRecordIndex: Int,
+      reverse: Boolean
   )
 
   private object TrainingType extends Enumeration {
@@ -69,37 +74,47 @@ private[wordstrainer] object LocalWords {
     val DoNotTrain, WordTrans, TransWord = Value
   }
 
-}
-
-private[wordstrainer] class LocalWords private(dataDir: String) {
-
-  def getLastPair: Option[(String, String)] = {
-    val lastWordPairOffset = MetaFile.getLastWordPairOffset(dataDir)
-    if (lastWordPairOffset.isEmpty) {
-      return Option.empty
-    }
-
-    val wordsFile = WordsFile(dataDir)
-    try {
-      Some(wordsFile.readAt(lastWordPairOffset.get))
-    } finally {
-      wordsFile.close()
+  private def remove(
+      externalWordToTranslations: mutable.Map[String, mutable.Set[String]],
+      word: String,
+      trans: String
+  ): Unit = {
+    externalWordToTranslations.get(word).foreach { translations =>
+      if (translations.remove(trans) && translations.isEmpty) {
+        externalWordToTranslations.remove(word)
+      }
     }
   }
 
-  def saveNewPairs(newPairs: collection.Seq[(String, String)]): Unit = {
-    if (newPairs.isEmpty) {
-      return
-    }
+}
+
+private[wordstrainer] class LocalWords private (dataDir: String) {
+
+  def saveNewPairs(externalPairs: collection.Seq[(String, String)]): Unit = {
+    val externalWordToTrans =
+      externalPairs.foldLeft(mutable.Map[String, mutable.Set[String]]()) {
+        (map, pair) =>
+          val translations = map.getOrElseUpdate(pair._1, mutable.Set())
+          translations += pair._2
+          map
+      }
 
     val wordsFile = WordsFile(dataDir)
     try {
-      wordsFile.seekEnd()
-
       val metaFile = MetaFile(dataDir)
       try {
-        for (wordPair <- newPairs) {
-          saveWordPair(wordsFile, metaFile, wordPair)
+        for (metaRecord <- metaFile) {
+          val localPair = wordsFile.readAt(metaRecord.wordsFileOffset)
+          remove(externalWordToTrans, localPair._1, localPair._2)
+          remove(externalWordToTrans, localPair._2, localPair._1)
+        }
+
+        wordsFile.seekEnd()
+        externalWordToTrans.foreachEntry { (word, translations) =>
+          translations.foreach { trans =>
+            println(s"New: $word $trans")
+            saveWordPair(wordsFile, metaFile, (word, trans))
+          }
         }
 
       } finally {
@@ -192,8 +207,8 @@ private[wordstrainer] class LocalWords private(dataDir: String) {
   }
 
   def saveAnswers(
-    trainedWords: collection.Seq[LocalWords.WordToTrain],
-    answers: Array[Boolean]
+      trainedWords: collection.Seq[LocalWords.WordToTrain],
+      answers: Array[Boolean]
   ): Unit = {
     val metaFile = MetaFile(dataDir)
     try {

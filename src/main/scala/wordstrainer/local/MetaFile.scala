@@ -2,7 +2,7 @@ package wordstrainer.local
 
 import wordstrainer.local.MetaFile.{fileName, recordLen}
 
-import java.io.{File, FileNotFoundException, RandomAccessFile}
+import java.io.{File, RandomAccessFile}
 import scala.collection.mutable
 
 private[wordstrainer] object MetaFile {
@@ -25,29 +25,6 @@ private[wordstrainer] object MetaFile {
 
     def this(wordsFileOffset: Long) = this(wordsFileOffset, 0, 0, 0, 0)
 
-  }
-
-  def getLastWordPairOffset(dataDir: String): Option[Long] = {
-    val metaRAF =
-      try {
-        new RandomAccessFile(new File(dataDir, fileName), "r")
-      } catch {
-        case _: FileNotFoundException => return Option.empty
-      }
-    try {
-      val metaFileLen = metaRAF.length()
-      if (metaFileLen == 0) {
-        return Option.empty
-      }
-
-      val numMetaRecords = metaFileLen / recordLen
-      val lastRecordOffset = (numMetaRecords - 1) * recordLen
-      metaRAF.seek(lastRecordOffset)
-      Some(metaRAF.readLong())
-
-    } finally {
-      metaRAF.close()
-    }
   }
 
 }
