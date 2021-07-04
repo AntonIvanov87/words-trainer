@@ -6,6 +6,7 @@ import java.io.FileNotFoundException
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ThreadLocalRandom
+import scala.collection.mutable.HashMap
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -92,9 +93,9 @@ private[wordstrainer] class LocalWords private (dataDir: String) {
 
   def saveNewPairs(externalPairs: collection.Seq[(String, String)]): Unit = {
     val externalWordToTrans =
-      externalPairs.foldLeft(mutable.Map[String, mutable.Set[String]]()) {
+      externalPairs.foldLeft(new HashMap[String, mutable.Set[String]](externalPairs.length, HashMap.defaultLoadFactor)) {
         (map, pair) =>
-          val translations = map.getOrElseUpdate(pair._1, mutable.Set())
+          val translations = map.getOrElseUpdate(pair._1, mutable.Set(pair._2))
           translations += pair._2
           map
       }
