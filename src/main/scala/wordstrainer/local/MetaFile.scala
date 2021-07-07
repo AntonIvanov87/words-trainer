@@ -5,15 +5,13 @@ import wordstrainer.local.MetaFile.{fileName, recordLen}
 import java.io.{File, RandomAccessFile}
 import scala.collection.mutable
 
-private[wordstrainer] object MetaFile {
+private object MetaFile {
   private val fileName = "meta.dat"
 
   // wordsOffset: Long
   // + num word->trans successes: Byte + word->trance last timestamp: Long
   // + num trans->word successes: Byte + trans->word last timestamp: Long
   private val recordLen = 8 + 1 + 8 + 1 + 8
-
-  def apply(dataDir: String) = new MetaFile(dataDir)
 
   case class Record(
       wordsFileOffset: Long,
@@ -29,7 +27,7 @@ private[wordstrainer] object MetaFile {
 
 }
 
-private[wordstrainer] class MetaFile private (dataDir: String)
+private class MetaFile(dataDir: String)
     extends IndexedSeq[MetaFile.Record]
     with mutable.Growable[MetaFile.Record]
     with AutoCloseable {

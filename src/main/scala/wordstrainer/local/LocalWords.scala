@@ -2,26 +2,47 @@ package wordstrainer.local
 
 import wordstrainer.local.LocalWords._
 
-import java.io.FileNotFoundException
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ThreadLocalRandom
-import scala.collection.mutable.HashMap
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 private[wordstrainer] object LocalWords {
 
-  def apply(dataDir: String) = new LocalWords(dataDir)
-
-  def toString(
-      metaRecord: MetaFile.Record,
+  case class PairWithTrainingData private (
       word: String,
-      trans: String
-  ): String = {
-    s"${metaRecord.wordsFileOffset} $word $trans " +
-      s"${metaRecord.wordTransSuccesses} ${Instant.ofEpochMilli(metaRecord.wordTransLastTime)} " +
-      s"${metaRecord.transWordSuccesses} ${Instant.ofEpochMilli(metaRecord.transWordLastTime)}"
+      trans: String,
+      wordTransSuccesses: Byte,
+      wordTransLastTime: Long,
+      transWordSuccesses: Byte,
+      transWordLastTime: Long,
+      private val wordsFileOffset: Long
+  ) {
+    override def toString: String = {
+      s"$word $trans " +
+        s"$wordTransSuccesses ${Instant.ofEpochMilli(wordTransLastTime)} " +
+        s"$transWordSuccesses ${Instant.ofEpochMilli(transWordLastTime)} " +
+        s"$wordsFileOffset"
+    }
+  }
+
+  private object PairWithTrainingData {
+    def apply(
+        word: String,
+        trans: String,
+        metaRecord: MetaFile.Record
+    ): PairWithTrainingData = {
+      PairWithTrainingData(
+        word,
+        trans,
+        metaRecord.wordTransSuccesses,
+        metaRecord.wordTransLastTime,
+        metaRecord.transWordSuccesses,
+        metaRecord.transWordLastTime,
+        metaRecord.wordsFileOffset
+      )
+    }
   }
 
   private def saveWordPair(
@@ -89,41 +110,50 @@ private[wordstrainer] object LocalWords {
 
 }
 
-private[wordstrainer] class LocalWords private (dataDir: String) {
+private[wordstrainer] class LocalWords(dataDir: String)
+    extends Iterable[PairWithTrainingData]
+    with AutoCloseable {
+
+  private[this] val metaFile = new MetaFile(dataDir)
+  private[this] val wordsFile =
+    try {
+      new WordsFile(dataDir)
+    } catch {
+      case th: Throwable =>
+        try {
+          metaFile.close()
+        } catch {
+          case th2: Throwable =>
+            th.addSuppressed(th2)
+        }
+        throw th
+    }
 
   def saveNewPairs(externalPairs: collection.Seq[(String, String)]): Unit = {
     val externalWordToTrans =
-      externalPairs.foldLeft(new HashMap[String, mutable.Set[String]](externalPairs.length, HashMap.defaultLoadFactor)) {
-        (map, pair) =>
-          val translations = map.getOrElseUpdate(pair._1, mutable.Set(pair._2))
-          translations += pair._2
-          map
+      externalPairs.foldLeft(
+        new mutable.HashMap[String, mutable.Set[String]](
+          externalPairs.length,
+          mutable.HashMap.defaultLoadFactor
+        )
+      ) { (map, pair) =>
+        val translations = map.getOrElseUpdate(pair._1, mutable.Set(pair._2))
+        translations += pair._2
+        map
       }
 
-    val wordsFile = WordsFile(dataDir)
-    try {
-      val metaFile = MetaFile(dataDir)
-      try {
-        for (metaRecord <- metaFile) {
-          val localPair = wordsFile.readAt(metaRecord.wordsFileOffset)
-          remove(externalWordToTrans, localPair._1, localPair._2)
-          remove(externalWordToTrans, localPair._2, localPair._1)
-        }
+    for (metaRecord <- metaFile) {
+      val localPair = wordsFile.readAt(metaRecord.wordsFileOffset)
+      remove(externalWordToTrans, localPair._1, localPair._2)
+      remove(externalWordToTrans, localPair._2, localPair._1)
+    }
 
-        wordsFile.seekEnd()
-        externalWordToTrans.foreachEntry { (word, translations) =>
-          translations.foreach { trans =>
-            println(s"New: $word $trans")
-            saveWordPair(wordsFile, metaFile, (word, trans))
-          }
-        }
-
-      } finally {
-        metaFile.close()
+    wordsFile.seekEnd()
+    externalWordToTrans.foreachEntry { (word, translations) =>
+      translations.foreach { trans =>
+        println(s"New: $word $trans")
+        saveWordPair(wordsFile, metaFile, (word, trans))
       }
-
-    } finally {
-      wordsFile.close()
     }
   }
 
@@ -131,78 +161,60 @@ private[wordstrainer] class LocalWords private (dataDir: String) {
     var totalToTrain = 0
     var totalTrained = 0
     val wordsToTrain = new ArrayBuffer[WordToTrain](10)
-    val metaFile =
-      try {
-        MetaFile(dataDir)
-      } catch {
-        case _: FileNotFoundException =>
-          return TrainingData(totalToTrain, totalTrained, wordsToTrain)
-      }
-    try {
-      val wordsFile = WordsFile(dataDir)
-      try {
-        var metaRecordIdx = 0
-        val curTime = System.currentTimeMillis()
-        for (metaRecord <- metaFile) {
-          val nextWordTransTime = getNextTrainTime(
-            metaRecord.wordTransSuccesses,
-            metaRecord.wordTransLastTime
-          )
-          val trainWordTrans =
-            if (nextWordTransTime <= curTime) {
-              totalToTrain += 1
-              true
-            } else {
-              totalTrained += 1
-              false
-            }
-
-          val nextTransWordTime = getNextTrainTime(
-            metaRecord.transWordSuccesses,
-            metaRecord.transWordLastTime
-          )
-          val trainTransWord =
-            if (nextTransWordTime <= curTime) {
-              totalToTrain += 1
-              true
-            } else {
-              totalTrained += 1
-              false
-            }
-
-          val trainingType =
-            if (trainWordTrans && trainTransWord) {
-              if (ThreadLocalRandom.current().nextBoolean()) {
-                TrainingType.WordTrans
-              } else {
-                TrainingType.TransWord
-              }
-            } else if (trainWordTrans) {
-              TrainingType.WordTrans
-            } else if (trainTransWord) {
-              TrainingType.TransWord
-            } else {
-              TrainingType.DoNotTrain
-            }
-
-          if (
-            trainingType != TrainingType.DoNotTrain && wordsToTrain.length < 10
-          ) {
-            wordsToTrain += newWordToTrain(
-              metaRecord,
-              metaRecordIdx,
-              wordsFile,
-              trainingType
-            )
-          }
-
-          metaRecordIdx += 1
+    var metaRecordIdx = 0
+    val curTime = System.currentTimeMillis()
+    for (metaRecord <- metaFile) {
+      val nextWordTransTime = getNextTrainTime(
+        metaRecord.wordTransSuccesses,
+        metaRecord.wordTransLastTime
+      )
+      val trainWordTrans =
+        if (nextWordTransTime <= curTime) {
+          totalToTrain += 1
+          true
+        } else {
+          totalTrained += 1
+          false
         }
-      } finally {
-        wordsFile.close()
+
+      val nextTransWordTime = getNextTrainTime(
+        metaRecord.transWordSuccesses,
+        metaRecord.transWordLastTime
+      )
+      val trainTransWord =
+        if (nextTransWordTime <= curTime) {
+          totalToTrain += 1
+          true
+        } else {
+          totalTrained += 1
+          false
+        }
+
+      val trainingType =
+        if (trainWordTrans && trainTransWord) {
+          if (ThreadLocalRandom.current().nextBoolean()) {
+            TrainingType.WordTrans
+          } else {
+            TrainingType.TransWord
+          }
+        } else if (trainWordTrans) {
+          TrainingType.WordTrans
+        } else if (trainTransWord) {
+          TrainingType.TransWord
+        } else {
+          TrainingType.DoNotTrain
+        }
+
+      if (trainingType != TrainingType.DoNotTrain && wordsToTrain.length < 10) {
+        wordsToTrain += newWordToTrain(
+          metaRecord,
+          metaRecordIdx,
+          wordsFile,
+          trainingType
+        )
       }
-    } finally {
-      metaFile.close()
+
+      metaRecordIdx += 1
     }
     TrainingData(totalToTrain, totalTrained, wordsToTrain)
   }
@@ -211,17 +223,56 @@ private[wordstrainer] class LocalWords private (dataDir: String) {
       trainedWords: collection.Seq[LocalWords.WordToTrain],
       answers: Array[Boolean]
   ): Unit = {
-    val metaFile = MetaFile(dataDir)
-    try {
-      var i = 0
-      for (w <- trainedWords) {
-        if (answers(i)) {
-          metaFile.inc(w.metaRecordIndex, w.reverse)
-        } else {
-          metaFile.resetRecord(w.metaRecordIndex)
-        }
-        i += 1
+    var i = 0
+    for (w <- trainedWords) {
+      if (answers(i)) {
+        metaFile.inc(w.metaRecordIndex, w.reverse)
+      } else {
+        metaFile.resetRecord(w.metaRecordIndex)
       }
+      i += 1
+    }
+  }
+
+  override def iterator: Iterator[PairWithTrainingData] = {
+    metaFile.iterator.map { metaRecord =>
+      val (word, trans) = wordsFile.readAt(metaRecord.wordsFileOffset)
+      PairWithTrainingData(word, trans, metaRecord)
+    }
+  }
+
+  def removeDuplicates(): Unit = {
+    var removed = false
+    do {
+      removed = false
+      val baseMeta = metaFile.last
+      if (wordsFile.isLastPair(baseMeta.wordsFileOffset)) {
+        val (baseWord, baseTrans) = wordsFile.readAt(baseMeta.wordsFileOffset)
+
+        var metaIndex = metaFile.length - 2
+        var dupFound = false
+        while (metaIndex >= 0 && !dupFound) {
+          val meta = metaFile(metaIndex)
+          val (word, trans) = wordsFile.readAt(meta.wordsFileOffset)
+          if (word == baseWord && trans == baseTrans) {
+            dupFound = true
+            println(
+              "Removing " + PairWithTrainingData(baseWord, baseTrans, baseMeta)
+            )
+            metaFile.removeLast()
+            wordsFile.removeFrom(baseMeta.wordsFileOffset)
+            removed = true
+          } else {
+            metaIndex -= 1
+          }
+        }
+      }
+    } while (removed)
+  }
+
+  override def close(): Unit = {
+    try {
+      wordsFile.close()
     } finally {
       metaFile.close()
     }

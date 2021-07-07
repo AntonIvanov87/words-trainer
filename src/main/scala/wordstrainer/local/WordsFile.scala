@@ -6,7 +6,7 @@ import java.io.{File, RandomAccessFile}
 import java.nio.charset.Charset
 import scala.collection.mutable
 
-private[wordstrainer] object WordsFile {
+private object WordsFile {
 
   private val fileName = "words.dat"
 
@@ -14,8 +14,8 @@ private[wordstrainer] object WordsFile {
 
 }
 
-private[wordstrainer] class WordsFile private(dataDir: String)
-  extends mutable.Growable[(String, String)]
+private class WordsFile(dataDir: String)
+    extends mutable.Growable[(String, String)]
     with AutoCloseable {
 
   private val raf = new RandomAccessFile(new File(dataDir, fileName), "rw")
