@@ -6,10 +6,11 @@ scala_library(
     data = ["settings.properties"],
 )
 
-scala_binary(
+java_binary(
     name = "words-trainer",
+    srcs = ["src/main/java/module-info.java"],
+    javacopts = ["--release 11"],
     main_class = "wordstrainer.Main",
-    unused_dependency_checker_mode = "error",
     deps = ["words-trainer-lib"],
 )
 
